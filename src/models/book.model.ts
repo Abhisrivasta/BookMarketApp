@@ -23,11 +23,6 @@ const bookSchema = new Schema<IBook>(
     description: { type: String },
     examType: { type: String },
     price: { type: Number, required: true },
-    condition: {
-      type: String,
-      enum: ["new", "used"],
-      default: "used",
-    },
     imageUrl: { type: String, required: true },
     seller: {
       type: Schema.Types.ObjectId,

@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import userRouter from "./router/user.route";
 import cookieParser from "cookie-parser";
+import bookRoutes from "./router/book.route"
 
 dotenv.config();
 
@@ -11,6 +12,8 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser()); 
 app.use("/api/user", userRouter);
+app.use("/api/books", bookRoutes);
+
 
 app.get('/', (req, res) => {
   res.send('Hello, World!');
