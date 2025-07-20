@@ -4,8 +4,12 @@ import dotenv from 'dotenv';
 import userRouter from "./router/user.route";
 import cookieParser from "cookie-parser";
 import bookRoutes from "./router/book.route"
+import cors from "cors"
+
 
 dotenv.config();
+
+
 
 const app = express();
 
@@ -13,6 +17,9 @@ app.use(express.json());
 app.use(cookieParser()); 
 app.use("/api/user", userRouter);
 app.use("/api/books", bookRoutes);
+app.use(cors());
+app.use(express.urlencoded({ extended: true })); 
+
 
 
 app.get('/', (req, res) => {

@@ -2,10 +2,22 @@ import { Request, Response } from "express";
 import Book from "../models/book.model";
 import { createBookSchemaValidator, getBookSchemaValidator } from "../validators/bookValidator";
 import { AuthRequest } from "../middleware/verifyToken";
+import { v2 as cloudinary } from "cloudinary";
+
+
 
 
 //create books
 export const handleCreateBook = async (req: AuthRequest, res: Response) => {
+
+  if (typeof req.body.location === "string") {
+  try {
+    req.body.location = JSON.parse(req.body.location);
+  } catch (err) {
+    return res.status(400).json({ message: "Invalid location format" });
+  }
+}
+
   const result = createBookSchemaValidator.safeParse(req.body);
 
   if (!result.success) {
@@ -15,7 +27,14 @@ export const handleCreateBook = async (req: AuthRequest, res: Response) => {
     });
   }
 
-  const { title, author, description, examType, price, imageUrl, location } = result.data;
+  const imageUrl = res.locals.cloudinaryImageUrl as string;
+    const cloudinaryPublicId = res.locals.cloudinaryPublicId as string;
+
+  if (!imageUrl || !cloudinaryPublicId) {
+    return res.status(400).json({ message: "Image URL missing" });
+  }
+  
+  const { title, author, description, examType, price, location } = result.data;
   const sellerId = (req.user as any).id;
 
   try {
@@ -27,6 +46,7 @@ export const handleCreateBook = async (req: AuthRequest, res: Response) => {
       price,
       imageUrl,
       seller: sellerId,
+        cloudinaryPublicId,
       location: location
         ? {
           type: "Point",
@@ -83,27 +103,39 @@ export const handleGetAllBooks = async (req: Request, res: Response) => {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
 
+    const total = await Book.countDocuments();
     const books = await Book.find()
       .lean()
       .limit(limit)
       .skip((page - 1) * limit)
       .populate("seller", "email");
 
-    const total = await Book.countDocuments();
+    const totalPages = Math.ceil(total / limit);
 
-    res.status(200).json({ total, page, limit, books });
+    res.status(200).json({ total, totalPages, page, limit, books });
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }
 };
 
+
 //handle get books of user 
 export const hanldeGetMyBooks = async (req: AuthRequest, res: Response) => {
   const sellerId = req.user?.id;
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 10;
 
   try {
-    const books = await Book.find({ seller: sellerId }).populate("seller", "email");
-    res.status(200).json({ books });
+    const total = await Book.countDocuments({ seller: sellerId });
+
+    const books = await Book.find({ seller: sellerId })
+      .limit(limit)
+      .skip((page - 1) * limit)
+      .populate("seller", "email");
+
+    const totalPages = Math.ceil(total / limit);
+
+    res.status(200).json({ books, total, totalPages, page, limit });
   } catch (error) {
     res.status(500).json({ message: "Error in server", error });
   }
@@ -112,27 +144,67 @@ export const hanldeGetMyBooks = async (req: AuthRequest, res: Response) => {
 
 //update book
 export const updateBook = async (req: AuthRequest, res: Response) => {
-  const {id} = req.params;
-  if(!id) return res.status(400).json({message:"BookId is not available"});
-  const{title, author, description, examType, price, imageUrl, location} = req.body;
+  const { id } = req.params;
+  if (!id) return res.status(400).json({ message: "Book ID is required" });
 
-try {
-   const book = await Book.findOneAndUpdate({id},{title, author, description, examType, price, imageUrl, location},{new:true})
-   if(!book) res.status(400).json({message:"book is not updated"})
-   return res.status(201).json({message:"book updated successfully",book})
-} catch (error) {
-  return res.status(500).json({message:"Internal server error"})
-}
+  const userId = req.user?.id;
+  const { title, author, description, examType, price, imageUrl, location } = req.body;
+
+  try {
+    const book = await Book.findById(id);
+    if (!book) {
+      return res.status(404).json({ message: "Book not found" });
+    }
+
+    if (book.seller.toString() !== userId) {
+      return res.status(403).json({ message: "You are not authorized to update this book" });
+    }
+
+    book.title = title;
+    book.author = author;
+    book.description = description;
+    book.examType = examType;
+    book.price = price;
+    book.imageUrl = imageUrl;
+    book.location = location;
+
+    const updatedBook = await book.save();
+
+    return res.status(200).json({ message: "Book updated successfully", book: updatedBook });
+  } catch (error) {
+    console.error("Update book error:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
 };
 
 
+//Delete books
 export const handleDeleteMyBook = async (req: AuthRequest, res: Response) => {
-  const{id}= req.params;
-  if(!id) return res.status(400).json({message:"Id is not available"});
+  const { id } = req.params;
+  const userId = req.user?.id;
+
+  if (!id) return res.status(400).json({ message: "Book ID is required" });
+
   try {
-    const book = await Book.findOneAndDelete({id});
-    return res.status(200).json({message:"Book deleted successfully"});
+    const book = await Book.findById(id);
+
+    if (!book) {
+      return res.status(404).json({ message: "Book not found" });
+    }
+
+    if (book.seller.toString() !== userId) {
+      return res.status(403).json({ message: "You are not authorized to delete this book" });
+    }
+
+       if (book.cloudinaryPublicId) {
+      await cloudinary.uploader.destroy(book.cloudinaryPublicId);
+    }
+
+    await book.deleteOne(); 
+
+    return res.status(200).json({ message: "Book deleted successfully" });
   } catch (error) {
-    return res.status(500).json({message:"Server error"});
+    console.error("Delete book error:", error);
+    return res.status(500).json({ message: "Server error", error });
   }
 };

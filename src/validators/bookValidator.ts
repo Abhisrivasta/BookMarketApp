@@ -12,10 +12,10 @@ export const createBookSchemaValidator = z.object({
     author: z.string().min(1, "Author is required"),
     description: z.string().optional(),
     examType: z.string().optional(),
-    price: z.number().positive("Price must be a positive number"),
-    imageUrl: z.string().url("Image URL must be a valid URL"),
+    price: z.coerce.number().positive("Price must be a positive number"),
     location: locationSchema.optional(),
 });
+
 
 
 export const getBookSchemaValidator = z.object({
