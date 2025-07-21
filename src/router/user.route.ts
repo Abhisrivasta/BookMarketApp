@@ -13,7 +13,7 @@ const router = express.Router();
 
 router.post('/register', registerUser);
 router.post('/login', handleLoginUser);
-router.get('/logout', logoutUser);
+router.post('/logout', logoutUser);
 router.post('/refreshToken', refreshAccessToken);
 
 // Password reset routes

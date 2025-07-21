@@ -48,7 +48,7 @@ export const registerUser = async (req: Request, res: Response) => {
             { expiresIn: "7d" }
         )
         if (!token || !refreshToken) {
-            res.status(403).json({ message: "Access token and refresh token are not created" })
+           return res.status(403).json({ message: "Access token and refresh token are not created" })
         }
 
         res.cookie("refreshToken", refreshToken, {
@@ -60,7 +60,6 @@ export const registerUser = async (req: Request, res: Response) => {
 
         return res.status(200).json({
             message: "User Registered successfully successful",
-            token,
             user: {
                 id: newUser._id,
                 name: newUser.name,
@@ -104,7 +103,7 @@ export const handleLoginUser = async (req: Request, res: Response) => {
         const token = jwt.sign(
             { userId: user._id },
             process.env.JWT_SECRET as string,
-            { expiresIn: "1d" }
+            { expiresIn: "15m" }
         );
 
         const refreshToken = jwt.sign(
@@ -120,9 +119,16 @@ export const handleLoginUser = async (req: Request, res: Response) => {
             maxAge: 7 * 24 * 60 * 60 * 1000,
         });
 
+        res.cookie("accessToken", token, {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "strict",
+  maxAge: 15 * 60 * 1000, 
+});
+
+
         return res.status(200).json({
             message: "Login successful",
-            token,
             user: {
                 id: user._id,
                 name: user.name,
@@ -165,6 +171,13 @@ export const refreshAccessToken = (req: Request, res: Response) => {
             process.env.JWT_SECRET as string,
             { expiresIn: "1d" }
         );
+
+        res.cookie("accessToken", accessToken, {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "strict",
+  maxAge: 15 * 60 * 1000, 
+});
 
         return res.status(200).json({ token: accessToken });
     } catch (err) {
