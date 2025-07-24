@@ -6,8 +6,11 @@ import {
   refreshAccessToken,
   forgetPassword,
   resetPassword,
-  getResetPassword
+  getResetPassword,
+  getUserProfile
 } from "../controller/user.controller";
+import { verifyToken } from "../middleware/verifyToken";
+
 
 const router = express.Router();
 
@@ -16,9 +19,13 @@ router.post('/login', handleLoginUser);
 router.post('/logout', logoutUser);
 router.post('/refreshToken', refreshAccessToken);
 
+router.get("/profile", verifyToken,getUserProfile);
+
+
 // Password reset routes
-router.post('/forgetPassword', forgetPassword);
-router.get('/reset-password/:token', getResetPassword);      
-router.post('/reset-password/:token', resetPassword);        
+router.post('/password/forgot', forgetPassword);
+router.get('/password/reset/:token', getResetPassword);
+router.post('/password/reset/:token', resetPassword);
+  
 
 export default router;

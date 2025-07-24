@@ -143,6 +143,35 @@ export const handleLoginUser = async (req: Request, res: Response) => {
     }
 };
 
+//getprofile
+export const getUserProfile = async (req: Request, res: Response) => {
+  const token = req.cookies?.accessToken;
+
+  if (!token) {
+    return res.status(401).json({ message: "Access token missing" });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as { userId: string };
+
+    const user = await User.findById(decoded.userId).select("-password");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    return res.status(200).json({
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+      },
+    });
+  } catch (err) {
+    return res.status(401).json({ message: "Invalid or expired token" });
+  }
+};
+
 
 //logout
 export const logoutUser = (req: Request, res: Response) => {
@@ -210,7 +239,7 @@ export const forgetPassword = async (req: Request, res: Response) => {
       { expiresIn: "15m" }
     );
 
-    const resetLink = `http://localhost:5173/reset-password/${token}`; // 🔁 FRONTEND link
+    const resetLink = `http://localhost:5173/redirect-reset?token=${token}`;
 
     const transporter = nodemailer.createTransport({
       service: "Gmail",
