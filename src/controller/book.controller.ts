@@ -47,13 +47,7 @@ export const handleCreateBook = async (req: AuthRequest, res: Response) => {
       imageUrl,
       seller: sellerId,
         cloudinaryPublicId,
-      location: location
-        ? {
-          type: "Point",
-          coordinates: location.coordinates,
-          placeName: location.placeName,
-        }
-        : undefined,
+      location
     });
 
     return res.status(201).json({ message: "Book created successfully", book });

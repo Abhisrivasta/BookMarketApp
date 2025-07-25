@@ -8,13 +8,9 @@ export interface IBook extends Document {
   price: number;
   condition?: "new" | "used";
   imageUrl: string;
-  cloudinaryPublicId?: string; 
+  cloudinaryPublicId?: string;
   seller: mongoose.Types.ObjectId;
-  location?: {
-    type: "Point";
-    coordinates: [number, number];
-    placeName: string;
-  };
+  location: number; 
 }
 
 const bookSchema = new Schema<IBook>(
@@ -24,9 +20,10 @@ const bookSchema = new Schema<IBook>(
     description: { type: String },
     examType: { type: String },
     price: { type: Number, required: true },
-    imageUrl: { type: String, required: true },
+    condition: { type: String, enum: ["new", "used"], default: "used" },
 
-    cloudinaryPublicId: { type: String }, 
+    imageUrl: { type: String, required: true },
+    cloudinaryPublicId: { type: String },
 
     seller: {
       type: Schema.Types.ObjectId,
@@ -35,20 +32,13 @@ const bookSchema = new Schema<IBook>(
     },
 
     location: {
-      type: {
-        type: String,
-        enum: ["Point"],
-        default: "Point",
-      },
-      coordinates: {
-        type: [Number],
-        index: "2dsphere",
-      },
-      placeName: String,
+      type: Number,
+      required: true,
     },
   },
   { timestamps: true }
 );
 
 const Book = mongoose.model<IBook>("Book", bookSchema);
+
 export default Book;
