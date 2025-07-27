@@ -13,7 +13,7 @@ export interface IBook extends Document {
   location: {
     latitude: number;
     longitude: number;
-    formattedAddress?: string; // ✅ Add to TypeScript type too
+    formattedAddress?: string; 
   };
 }
 

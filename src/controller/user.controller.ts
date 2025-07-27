@@ -30,7 +30,7 @@ export const registerUser = async (req: Request, res: Response) => {
     const newUser = await User.create({
       name,
       email,
-      phone, 
+      phone,
       password: hashedPassword,
     });
 
@@ -69,7 +69,7 @@ export const registerUser = async (req: Request, res: Response) => {
         id: newUser._id,
         name: newUser.name,
         email: newUser.email,
-        phone: newUser.phone, 
+        phone: newUser.phone,
       },
     });
   } catch (error) {
@@ -129,7 +129,7 @@ export const handleLoginUser = async (req: Request, res: Response) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 15 * 60 * 1000,
+      maxAge: 1 *24*24*  60 * 1000,
     });
 
 
@@ -171,7 +171,7 @@ export const getUserProfile = async (req: Request, res: Response) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        phone:user.phone,
+        phone: user.phone,
       },
     });
   } catch (err) {
@@ -221,7 +221,7 @@ export const refreshAccessToken = (req: Request, res: Response) => {
       maxAge: 15 * 60 * 1000,
     });
 
-    return res.status(200).json({ token: accessToken });
+    return res.status(200).json({ accessToken });
   } catch (err) {
     return res.status(403).json({ message: "Invalid or expired refresh token" });
   }

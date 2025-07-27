@@ -144,7 +144,7 @@ export const updateBook = async (req: AuthRequest, res: Response) => {
   if (!id) return res.status(400).json({ message: "Book ID is required" });
 
   const userId = req.user?.id;
-  const { title, author, description, examType, price, imageUrl, location } = req.body;
+  const { title, author, description, examType, price, condition } = req.body;
 
   try {
     const book = await Book.findById(id);
@@ -161,8 +161,10 @@ export const updateBook = async (req: AuthRequest, res: Response) => {
     book.description = description;
     book.examType = examType;
     book.price = price;
-    book.imageUrl = imageUrl;
-    book.location = location;
+    book.condition = condition;
+
+    if (req.file) {
+    }
 
     const updatedBook = await book.save();
 
@@ -172,6 +174,7 @@ export const updateBook = async (req: AuthRequest, res: Response) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 };
+
 
 
 //Delete books
