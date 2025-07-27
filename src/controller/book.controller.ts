@@ -3,20 +3,17 @@ import Book from "../models/book.model";
 import { createBookSchemaValidator, getBookSchemaValidator } from "../validators/bookValidator";
 import { AuthRequest } from "../middleware/verifyToken";
 import { v2 as cloudinary } from "cloudinary";
+import { getHumanReadableLocation } from "../geocode";
 
-
-
-
-//create books
 export const handleCreateBook = async (req: AuthRequest, res: Response) => {
-
   if (typeof req.body.location === "string") {
-  try {
-    req.body.location = JSON.parse(req.body.location);
-  } catch (err) {
-    return res.status(400).json({ message: "Invalid location format" });
+    try {
+      req.body.location = JSON.parse(req.body.location);
+      console.log(req.body.location)
+    } catch (err) {
+      return res.status(400).json({ message: "Invalid location format" });
+    }
   }
-}
 
   const result = createBookSchemaValidator.safeParse(req.body);
 
@@ -28,16 +25,18 @@ export const handleCreateBook = async (req: AuthRequest, res: Response) => {
   }
 
   const imageUrl = res.locals.cloudinaryImageUrl as string;
-    const cloudinaryPublicId = res.locals.cloudinaryPublicId as string;
+  const cloudinaryPublicId = res.locals.cloudinaryPublicId as string;
 
   if (!imageUrl || !cloudinaryPublicId) {
     return res.status(400).json({ message: "Image URL missing" });
   }
-  
+
   const { title, author, description, examType, price, location } = result.data;
   const sellerId = (req.user as any).id;
 
   try {
+    const formattedAddress = await getHumanReadableLocation(location.latitude, location.longitude);
+
     const book = await Book.create({
       title,
       author,
@@ -45,9 +44,12 @@ export const handleCreateBook = async (req: AuthRequest, res: Response) => {
       examType,
       price,
       imageUrl,
+      cloudinaryPublicId,
+      location: {
+        ...location,
+        formattedAddress,
+      },
       seller: sellerId,
-        cloudinaryPublicId,
-      location
     });
 
     return res.status(201).json({ message: "Book created successfully", book });
@@ -73,7 +75,7 @@ export const handleGetBookById = async (req: AuthRequest, res: Response) => {
 
 
   try {
-    const book = await Book.findById(id).populate("seller", "email");
+const book = await Book.findById(id).populate("seller", "name email phone");
 
     if (!book) {
       return res.status(404).json({ message: "Book not found" });
@@ -102,7 +104,7 @@ export const handleGetAllBooks = async (req: Request, res: Response) => {
       .lean()
       .limit(limit)
       .skip((page - 1) * limit)
-      .populate("seller", "email");
+      .populate("seller",  "name email phone");
 
     const totalPages = Math.ceil(total / limit);
 
@@ -125,7 +127,7 @@ export const hanldeGetMyBooks = async (req: AuthRequest, res: Response) => {
     const books = await Book.find({ seller: sellerId })
       .limit(limit)
       .skip((page - 1) * limit)
-      .populate("seller", "email");
+      .populate("seller",  "name email phone");
 
     const totalPages = Math.ceil(total / limit);
 

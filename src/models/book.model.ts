@@ -10,7 +10,11 @@ export interface IBook extends Document {
   imageUrl: string;
   cloudinaryPublicId?: string;
   seller: mongoose.Types.ObjectId;
-  location: number; 
+  location: {
+    latitude: number;
+    longitude: number;
+    formattedAddress?: string; // ✅ Add to TypeScript type too
+  };
 }
 
 const bookSchema = new Schema<IBook>(
@@ -32,13 +36,13 @@ const bookSchema = new Schema<IBook>(
     },
 
     location: {
-      type: Number,
-      required: true,
+      latitude: { type: Number, required: true },
+      longitude: { type: Number, required: true },
+      formattedAddress: { type: String }, 
     },
   },
   { timestamps: true }
 );
 
 const Book = mongoose.model<IBook>("Book", bookSchema);
-
 export default Book;

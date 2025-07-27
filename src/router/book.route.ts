@@ -8,7 +8,7 @@ import { uploadImageMiddleware } from "../middleware/uploadImages";
 const router = express.Router();
 
 router.post("/book",verifyToken,upload.single('image'),uploadImageMiddleware,handleCreateBook)
-router.get("/books/:id", verifyToken, handleGetBookById)
+router.get("/books/:id", handleGetBookById)
 router.get("/books",handleGetAllBooks)
 router.get("/myBooks/:id",verifyToken,hanldeGetMyBooks)
 

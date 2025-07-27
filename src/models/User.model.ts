@@ -4,6 +4,7 @@ export interface IUser extends Document {
   name: string;
   email: string;
   password: string;
+  phone:string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -20,6 +21,12 @@ const userSchema: Schema<IUser> = new Schema(
       unique: true,
       lowercase: true,
     },
+    phone: { type: String,
+       required: true, 
+       unique: true ,
+  match: /^[0-9]{10}$/, // ✅ Accepts '9142033101' only (no country code)
+      },
+
     password: {
       type: String,
       required: [true, "Password is required"],

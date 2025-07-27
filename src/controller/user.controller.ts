@@ -7,140 +7,146 @@ import nodemailer from "nodemailer"
 
 //register
 export const registerUser = async (req: Request, res: Response) => {
-    const result = registerValidator.safeParse(req.body);
+  const result = registerValidator.safeParse(req.body);
 
+  if (!result.success) {
+    return res.status(400).json({
+      message: 'Validation failed',
+      errors: result.error.flatten().fieldErrors,
+    });
+  }
 
-    if (!result.success) {
-        return res.status(400).json({
-            message: 'validation failed',
-            errors: result.error.flatten().fieldErrors,
-        });
+  const { name, email, phone, password } = result.data;
+
+  try {
+    const existingUser = await User.findOne({ email });
+
+    if (existingUser) {
+      return res.status(409).json({ message: 'Email already registered' });
     }
 
-    const { name, email, password } = result.data;
-    try {
-        const existingUser = await User.findOne({ email })
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-        if (existingUser) {
-            return res.status(409).json({ message: 'Email already registered' });
-        }
+    const newUser = await User.create({
+      name,
+      email,
+      phone, 
+      password: hashedPassword,
+    });
 
-        const hashedPassword = await bcrypt.hash(password, 10)
-
-        const newUser = await User.create({
-            name,
-            email,
-            password: hashedPassword,
-        });
-
-        if (!newUser) {
-            res.status(404).json({ message: "newUser not created " })
-        }
-
-        const token = jwt.sign(
-            { userId: newUser._id },
-            process.env.JWT_SECRET!,
-            { expiresIn: "1d" }
-        )
-        const refreshToken = jwt.sign(
-            { userId: newUser._id },
-            process.env.REFRESH_SECRET as string,
-            { expiresIn: "7d" }
-        )
-        if (!token || !refreshToken) {
-           return res.status(403).json({ message: "Access token and refresh token are not created" })
-        }
-
-        res.cookie("refreshToken", refreshToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "strict",
-            maxAge: 7 * 24 * 60 * 60 * 1000,
-        });
-
-        return res.status(200).json({
-            message: "User Registered successfully successful",
-            user: {
-                id: newUser._id,
-                name: newUser.name,
-                email: newUser.email,
-            },
-        });
-    } catch (error) {
-        res.status(500).json({ message: "Server error", error })
+    if (!newUser) {
+      return res.status(404).json({ message: "User not created" });
     }
-}
+
+    const token = jwt.sign(
+      { userId: newUser._id },
+      process.env.JWT_SECRET!,
+      { expiresIn: "1d" }
+    );
+    const refreshToken = jwt.sign(
+      { userId: newUser._id },
+      process.env.REFRESH_SECRET!,
+      { expiresIn: "7d" }
+    );
+
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    res.cookie("accessToken", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 15 * 60 * 1000,
+    });
+
+    return res.status(200).json({
+      message: "User registered successfully",
+      user: {
+        id: newUser._id,
+        name: newUser.name,
+        email: newUser.email,
+        phone: newUser.phone, 
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error });
+  }
+};
 
 
 
 //login
 export const handleLoginUser = async (req: Request, res: Response) => {
-    const result = loginValidator.safeParse(req.body);
+  const result = loginValidator.safeParse(req.body);
 
 
-    if (!result.success) {
-        return res.status(400).json({
-            message: "Validation failed",
-            errors: result.error.flatten().fieldErrors,
-        });
+  if (!result.success) {
+    return res.status(400).json({
+      message: "Validation failed",
+      errors: result.error.flatten().fieldErrors,
+    });
+  }
+
+  const { email, password } = result.data;
+
+  try {
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ message: "User does not exist" });
     }
 
-    const { email, password } = result.data;
+    const isMatch = await bcrypt.compare(password, user.password);
 
-    try {
-        const user = await User.findOne({ email });
-
-        if (!user) {
-            return res.status(404).json({ message: "User does not exist" });
-        }
-
-        const isMatch = await bcrypt.compare(password, user.password);
-
-        if (!isMatch) {
-            return res.status(401).json({ message: "Incorrect password" });
-        }
-
-        const token = jwt.sign(
-            { userId: user._id },
-            process.env.JWT_SECRET as string,
-            { expiresIn: "15m" }
-        );
-
-        const refreshToken = jwt.sign(
-            { userId: user._id },
-            process.env.REFRESH_SECRET as string,
-            { expiresIn: "7d" }
-        )
-
-        res.cookie("refreshToken", refreshToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "strict",
-            maxAge: 7 * 24 * 60 * 60 * 1000,
-        });
-
-        res.cookie("accessToken", token, {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "strict",
-  maxAge: 15 * 60 * 1000, 
-});
-
-
-        return res.status(200).json({
-            message: "Login successful",
-            user: {
-                id: user._id,
-                name: user.name,
-                email: user.email,
-            },
-        });
-    } catch (error) {
-        return res.status(500).json({
-            message: "Server error",
-            error: (error as Error).message,
-        });
+    if (!isMatch) {
+      return res.status(401).json({ message: "Incorrect password" });
     }
+
+    const token = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_SECRET as string,
+      { expiresIn: "15m" }
+    );
+
+    const refreshToken = jwt.sign(
+      { userId: user._id },
+      process.env.REFRESH_SECRET as string,
+      { expiresIn: "7d" }
+    )
+
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    res.cookie("accessToken", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 15 * 60 * 1000,
+    });
+
+
+    return res.status(200).json({
+      message: "Login successful",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Server error",
+      error: (error as Error).message,
+    });
+  }
 };
 
 //getprofile
@@ -165,6 +171,7 @@ export const getUserProfile = async (req: Request, res: Response) => {
         id: user._id,
         name: user.name,
         email: user.email,
+        phone:user.phone,
       },
     });
   } catch (err) {
@@ -175,43 +182,49 @@ export const getUserProfile = async (req: Request, res: Response) => {
 
 //logout
 export const logoutUser = (req: Request, res: Response) => {
-    res.clearCookie("refreshToken", {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-    });
-    return res.status(200).json({ message: "Logged out successfully" });
+  res.clearCookie("refreshToken", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+  });
+  res.clearCookie("accessToken", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+  });
+
+  return res.status(200).json({ message: "Logged out successfully" });
 };
 
 
 // Refresh token
 export const refreshAccessToken = (req: Request, res: Response) => {
-    const token = req.cookies?.refreshToken;
+  const token = req.cookies?.refreshToken;
 
-    if (!token) {
-        return res.status(401).json({ message: "No refresh token provided" });
-    }
+  if (!token) {
+    return res.status(401).json({ message: "No refresh token provided" });
+  }
 
-    try {
-        const decoded = jwt.verify(token, process.env.REFRESH_SECRET as string) as { userId: string };
+  try {
+    const decoded = jwt.verify(token, process.env.REFRESH_SECRET as string) as { userId: string };
 
-        const accessToken = jwt.sign(
-            { userId: decoded.userId },
-            process.env.JWT_SECRET as string,
-            { expiresIn: "1d" }
-        );
+    const accessToken = jwt.sign(
+      { userId: decoded.userId },
+      process.env.JWT_SECRET as string,
+      { expiresIn: "1d" }
+    );
 
-        res.cookie("accessToken", accessToken, {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "strict",
-  maxAge: 15 * 60 * 1000, 
-});
+    res.cookie("accessToken", accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 15 * 60 * 1000,
+    });
 
-        return res.status(200).json({ token: accessToken });
-    } catch (err) {
-        return res.status(403).json({ message: "Invalid or expired refresh token" });
-    }
+    return res.status(200).json({ token: accessToken });
+  } catch (err) {
+    return res.status(403).json({ message: "Invalid or expired refresh token" });
+  }
 };
 
 

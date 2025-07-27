@@ -19,31 +19,31 @@ export const uploadToCloudinary = async (req: Request): Promise<any> => {
   const fileBuffer = req.file.buffer;
   const originalName = req.file.originalname;
 
-  const  data = await new Promise((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         folder: 'books',
         public_id: originalName.split('.')[0],
         resource_type: 'image',
-         transformation: [
-      { quality: "auto:low" },          
-      { fetch_format: "auto" }              
-    ]
+        timeout: 60000, 
+        transformation: [
+          { quality: "auto:eco" },     
+          { fetch_format: "auto" },    
+        ],
       },
       (error, result) => {
-        if (result) resolve(result);
-        else reject(error);
+        if (error) {
+          console.error("❌ Cloudinary upload error:", error);
+          reject(error);
+        } else {
+          console.log("✅ Uploaded to Cloudinary:", result?.secure_url);
+          resolve(result);
+        }
       }
     );
 
-    const uploaddata = streamifier.createReadStream(fileBuffer).pipe(uploadStream);
-
+    streamifier.createReadStream(fileBuffer).pipe(uploadStream);
   });
-  console.log("urls",data as any)
-  return data;
- 
 };
-
-
 
 export { cloudinary };
