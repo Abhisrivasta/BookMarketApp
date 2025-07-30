@@ -4,6 +4,9 @@ import jwt from "jsonwebtoken"
 import bcrypt from "bcrypt"
 import { registerValidator, loginValidator, forgetPasswordValidator } from "../validators/userValidator";
 import nodemailer from "nodemailer"
+import { AuthRequest } from "../middleware/verifyToken";
+import { v2 as cloudinary } from "cloudinary";
+
 
 //register
 export const registerUser = async (req: Request, res: Response) => {
@@ -17,10 +20,14 @@ export const registerUser = async (req: Request, res: Response) => {
   }
 
   const { name, email, phone, password } = result.data;
+  const imageUrl = res.locals.cloudinaryImageUrl as string;
+  const cloudinaryPublicId = res.locals.cloudinaryPublicId as string;
 
+  if (!imageUrl || !cloudinaryPublicId) {
+    return res.status(400).json({ message: "Image URL missing" });
+  }
   try {
     const existingUser = await User.findOne({ email });
-
     if (existingUser) {
       return res.status(409).json({ message: 'Email already registered' });
     }
@@ -31,36 +38,9 @@ export const registerUser = async (req: Request, res: Response) => {
       name,
       email,
       phone,
+      imageUrl,
+      cloudinaryPublicId,
       password: hashedPassword,
-    });
-
-    if (!newUser) {
-      return res.status(404).json({ message: "User not created" });
-    }
-
-    const token = jwt.sign(
-      { userId: newUser._id },
-      process.env.JWT_SECRET!,
-      { expiresIn: "1d" }
-    );
-    const refreshToken = jwt.sign(
-      { userId: newUser._id },
-      process.env.REFRESH_SECRET!,
-      { expiresIn: "7d" }
-    );
-
-    res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-
-    res.cookie("accessToken", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 15 * 60 * 1000,
     });
 
     return res.status(200).json({
@@ -70,12 +50,16 @@ export const registerUser = async (req: Request, res: Response) => {
         name: newUser.name,
         email: newUser.email,
         phone: newUser.phone,
+        imageUrl: newUser.imageUrl 
       },
     });
+
   } catch (error) {
-    res.status(500).json({ message: "Server error", error });
+    return res.status(500).json({ message: "Server error", error: (error as Error).message });
   }
 };
+
+
 
 
 
@@ -172,12 +156,71 @@ export const getUserProfile = async (req: Request, res: Response) => {
         name: user.name,
         email: user.email,
         phone: user.phone,
+        imageUrl:user.imageUrl
       },
     });
   } catch (err) {
     return res.status(401).json({ message: "Invalid or expired token" });
   }
 };
+
+//update UserProfile
+export const updateUserProfile = async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  const userId = req.user?.id;
+
+  if (!id) {
+    return res.status(400).json({ message: "User ID is missing" });
+  }
+
+  if (id !== userId) {
+    return res.status(403).json({ message: "Unauthorized: Cannot update another user's profile" });
+  }
+
+  const { name, email, phone } = req.body;
+
+  const imageUrl = res.locals.cloudinaryImageUrl as string | undefined;
+  const cloudinaryPublicId = res.locals.cloudinaryPublicId as string | undefined;
+
+  try {
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Update only fields provided
+    if (name) user.name = name;
+    if (email) user.email = email;
+    if (phone) user.phone = phone;
+
+    // If new image uploaded, delete old one and update
+    if (imageUrl && cloudinaryPublicId) {
+      if (user.cloudinaryPublicId) {
+        await cloudinary.uploader.destroy(user.cloudinaryPublicId);
+      }
+      user.imageUrl = imageUrl;
+      user.cloudinaryPublicId = cloudinaryPublicId;
+    }
+
+    const updatedUserProfile = await user.save();
+
+    return res.status(200).json({
+      message: "User updated successfully",
+      user: {
+        id: updatedUserProfile._id,
+        name: updatedUserProfile.name,
+        email: updatedUserProfile.email,
+        phone: updatedUserProfile.phone,
+        imageUrl: updatedUserProfile.imageUrl
+      }
+    });
+
+  } catch (error) {
+    console.error("Update Profile Error:", error);
+    return res.status(500).json({ message: "Server error", error: (error as Error).message });
+  }
+};
+
 
 
 //logout

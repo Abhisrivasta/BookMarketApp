@@ -98,19 +98,55 @@ export const handleGetAllBooks = async (req: Request, res: Response) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
+    
+    const search = req.query.search as string;
+    const priceMin = parseFloat(req.query.priceMin as string);
+    const priceMax = parseFloat(req.query.priceMax as string);
+    const condition = req.query.condition as string;
+    const sort = req.query.sort as string;
 
-    const total = await Book.countDocuments();
-    const books = await Book.find()
+    // 📌 Build filter object
+    let filter: any = {};
+
+    // 🔍 Search by title or author
+    if (search) {
+      filter.$or = [
+        { title: { $regex: search, $options: "i" } },
+        { author: { $regex: search, $options: "i" } }
+      ];
+    }
+
+    // 💰 Price range
+    if (!isNaN(priceMin) || !isNaN(priceMax)) {
+      filter.price = {};
+      if (!isNaN(priceMin)) filter.price.$gte = priceMin;
+      if (!isNaN(priceMax)) filter.price.$lte = priceMax;
+    }
+
+    // 📦 Condition filter
+    if (condition) {
+      filter.condition = condition;
+    }
+
+    // 📌 Base query
+    let query = Book.find(filter)
+      .populate("seller", "name email phone")
       .lean()
-      .limit(limit)
       .skip((page - 1) * limit)
-      .populate("seller",  "name email phone");
+      .limit(limit);
 
+    // 📌 Sorting
+    if (sort === "asc") query = query.sort({ price: 1 });
+    if (sort === "desc") query = query.sort({ price: -1 });
+
+    // 📌 Execute
+    const total = await Book.countDocuments(filter);
+    const books = await query;
     const totalPages = Math.ceil(total / limit);
 
     res.status(200).json({ total, totalPages, page, limit, books });
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", error });
   }
 };
 
@@ -119,7 +155,7 @@ export const handleGetAllBooks = async (req: Request, res: Response) => {
 export const hanldeGetMyBooks = async (req: AuthRequest, res: Response) => {
   const sellerId = req.user?.id;
   const page = parseInt(req.query.page as string) || 1;
-  const limit = parseInt(req.query.limit as string) || 10;
+  const limit = parseInt(req.query.limit as string) || 5;
 
   try {
     const total = await Book.countDocuments({ seller: sellerId });
