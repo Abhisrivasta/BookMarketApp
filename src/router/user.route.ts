@@ -14,6 +14,7 @@ import {
 import { verifyToken } from "../middleware/verifyToken";
 import { upload } from "../middleware/multer";
 import { uploadImageMiddleware } from "../middleware/uploadImages";
+import { contactUs } from "../controller/user.controller";
 
 
 const router = express.Router();
@@ -23,8 +24,13 @@ router.post('/login', handleLoginUser);
 router.post('/logout', logoutUser);
 router.post('/refreshToken', refreshAccessToken);
 
+
 router.get("/profile", verifyToken,getUserProfile);
 router.put("/profile/:id",verifyToken ,upload.single('photo'),uploadImageMiddleware, updateUserProfile);
+
+
+router.post("/contact", contactUs);
+
 
 
 

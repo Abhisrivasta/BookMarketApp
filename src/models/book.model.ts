@@ -11,9 +11,9 @@ export interface IBook extends Document {
   cloudinaryPublicId?: string;
   seller: mongoose.Types.ObjectId;
   location: {
-    latitude: number;
-    longitude: number;
-    formattedAddress?: string; 
+    type: "Point";
+    coordinates: [number, number]; 
+    formattedAddress?: string;
   };
 }
 
@@ -36,13 +36,23 @@ const bookSchema = new Schema<IBook>(
     },
 
     location: {
-      latitude: { type: Number, required: true },
-      longitude: { type: Number, required: true },
-      formattedAddress: { type: String }, 
+      type: {
+        type: String,
+        enum: ["Point"],
+        required: true,
+      },
+      coordinates: {
+        type: [Number], // [longitude, latitude]
+        required: true,
+      },
+      formattedAddress: { type: String },
     },
   },
   { timestamps: true }
 );
+
+// Create 2dsphere index for $near
+bookSchema.index({ location: "2dsphere" });
 
 const Book = mongoose.model<IBook>("Book", bookSchema);
 export default Book;

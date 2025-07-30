@@ -1,11 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
 import { uploadToCloudinary } from '../config/cloudinaryConfig';
 
+
 export const uploadImageMiddleware = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await uploadToCloudinary(req);
+    if (!req.file) {   
+      return next();
+    }
 
-    res.locals.cloudinaryImageUrl = result.secure_url || result.url; 
+    const result = await uploadToCloudinary(req);
+    res.locals.cloudinaryImageUrl = result.secure_url || result.url;
     res.locals.cloudinaryPublicId = result.public_id;
     next();
   } catch (error) {

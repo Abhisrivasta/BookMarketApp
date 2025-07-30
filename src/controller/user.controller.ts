@@ -5,6 +5,7 @@ import bcrypt from "bcrypt"
 import { registerValidator, loginValidator, forgetPasswordValidator } from "../validators/userValidator";
 import nodemailer from "nodemailer"
 import { AuthRequest } from "../middleware/verifyToken";
+import Contact from "../models/Contact.model"; 
 import { v2 as cloudinary } from "cloudinary";
 
 
@@ -188,12 +189,10 @@ export const updateUserProfile = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Update only fields provided
     if (name) user.name = name;
     if (email) user.email = email;
     if (phone) user.phone = phone;
 
-    // If new image uploaded, delete old one and update
     if (imageUrl && cloudinaryPublicId) {
       if (user.cloudinaryPublicId) {
         await cloudinary.uploader.destroy(user.cloudinaryPublicId);
@@ -272,7 +271,7 @@ export const refreshAccessToken = (req: Request, res: Response) => {
 
 
 
-// POST /api/user/forgetPassword
+// forgetPassword
 export const forgetPassword = async (req: Request, res: Response) => {
   const result = forgetPasswordValidator.safeParse(req.body);
 
@@ -319,7 +318,7 @@ export const forgetPassword = async (req: Request, res: Response) => {
   }
 };
 
-// ✅ GET /api/user/reset-password/:token
+// getreset-password/:token
 export const getResetPassword = async (req: Request, res: Response) => {
   const { token } = req.params;
 
@@ -331,13 +330,18 @@ export const getResetPassword = async (req: Request, res: Response) => {
   }
 };
 
-// ✅ POST /api/user/reset-password/:token
+//reset-password/:token
 export const resetPassword = async (req: Request, res: Response) => {
   const { newPassword } = req.body;
   const { token } = req.params;
 
+  if (!newPassword || newPassword.length < 6) {
+    return res.status(400).json({ message: "Password must be at least 6 characters" });
+  }
+
   try {
     const decoded = jwt.verify(token, process.env.RESET_SECRET!) as { userId: string };
+    console.log("Decoded token:", decoded);
 
     const user = await User.findById(decoded.userId);
     if (!user) return res.status(404).json({ message: "User not found" });
@@ -345,9 +349,52 @@ export const resetPassword = async (req: Request, res: Response) => {
     user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
 
+    console.log("Password updated for:", user.email);
+
     res.status(200).json({ message: "Password updated successfully" });
 
   } catch (err) {
+    console.error("Reset error:", err);
     res.status(400).json({ message: "Invalid or expired token" });
+  }
+};
+
+
+export const contactUs = async (req: Request, res: Response) => {
+  const { name, email, message } = req.body;
+
+  if (!name || !email || !message) {
+    return res.status(400).json({ message: "All fields are required" });
+  }
+
+  try {
+    const contactMessage = await Contact.create({ name, email, message });
+
+    const transporter = nodemailer.createTransport({
+      service: "Gmail",
+      auth: {
+        user: process.env.MAIL_USER,
+        pass: process.env.MAIL_PASS,
+      },
+    });
+
+    await transporter.sendMail({
+      from: `"Book Store Contact" <${email}>`,
+      to: process.env.ADMIN_EMAIL, 
+      subject: `New Contact Message from ${name}`,
+      html: `
+        <p><b>Name:</b> ${name}</p>
+        <p><b>Email:</b> ${email}</p>
+        <p><b>Message:</b></p>
+        <p>${message}</p>
+      `,
+    });
+
+    return res.status(201).json({
+      message: "Message sent successfully",
+      contact: contactMessage,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error: (error as Error).message });
   }
 };

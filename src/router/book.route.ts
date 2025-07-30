@@ -1,18 +1,23 @@
 import express from "express"
 import { verifyToken } from "../middleware/verifyToken";
-import {  handleCreateBook, handleDeleteMyBook, handleGetAllBooks, handleGetBookById, hanldeGetMyBooks, updateBook } from "../controller/book.controller";
+import {  getNearbyBooks, handleCreateBook, handleDeleteMyBook, handleGetAllBooks, handleGetBookById, hanldeGetMyBooks, updateBook } from "../controller/book.controller";
 import { upload } from "../middleware/multer";
 import { uploadImageMiddleware } from "../middleware/uploadImages";
 
 
 const router = express.Router();
 
-router.post("/book",verifyToken,upload.single('image'),uploadImageMiddleware,handleCreateBook)
-router.get("/books/:id", handleGetBookById)
-router.get("/books",handleGetAllBooks)
-router.get("/myBooks/",verifyToken,hanldeGetMyBooks)
+router.post("/book", verifyToken, upload.single('image'), uploadImageMiddleware, handleCreateBook)
 
-router.put("/books/:id", verifyToken, upload.single("image"), updateBook);
-router.delete("/books/:id",verifyToken,handleDeleteMyBook)
+router.get("/nearby", getNearbyBooks)
+
+router.get("/books", handleGetAllBooks)
+router.get("/books/:id", handleGetBookById)
+
+router.get("/myBooks", verifyToken, hanldeGetMyBooks)
+
+router.put("/books/:id", verifyToken, upload.single("image"), uploadImageMiddleware, updateBook)
+router.delete("/books/:id", verifyToken, handleDeleteMyBook)
+
 
 export default router;

@@ -11,6 +11,7 @@ cloudinary.config({
   api_secret: process.env.CLOUD_API_SECRET!,
 });
 
+// ⬇️ Optimized Cloudinary Upload
 export const uploadToCloudinary = async (req: Request): Promise<any> => {
   if (!req.file) {
     throw new Error('No file found in request');
@@ -25,10 +26,13 @@ export const uploadToCloudinary = async (req: Request): Promise<any> => {
         folder: 'books',
         public_id: originalName.split('.')[0],
         resource_type: 'image',
-        timeout: 60000, 
+        timeout: 120000, // ⏱️ 2-minute timeout
+
+        // 🧠 Smart compression and resizing
         transformation: [
-          { quality: "auto:eco" },     
-          { fetch_format: "auto" },    
+          { width: 1000, height: 1000, crop: "limit" }, // 👈 limit image size while preserving ratio
+          { quality: "auto:good" }, // 👈 optimize while keeping good quality
+          { fetch_format: "auto" }, // 👈 convert to WebP/AVIF automatically
         ],
       },
       (error, result) => {
@@ -47,3 +51,4 @@ export const uploadToCloudinary = async (req: Request): Promise<any> => {
 };
 
 export { cloudinary };
+  
