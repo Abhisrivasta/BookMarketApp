@@ -1,7 +1,7 @@
 import express from "express";
 import {
   registerUser,
-  handleLoginUser,
+  
   logoutUser,
   refreshAccessToken,
   forgetPassword,
@@ -9,6 +9,7 @@ import {
   getResetPassword,
   getUserProfile,
   updateUserProfile,
+  handleLoginUser,
   
 } from "../controller/user.controller";
 import { verifyToken } from "../middleware/verifyToken";
@@ -20,7 +21,7 @@ import { contactUs } from "../controller/user.controller";
 const router = express.Router();
 
 router.post('/register',upload.single('photo'),uploadImageMiddleware, registerUser);
-router.post('/login', handleLoginUser);
+router.post('/login',handleLoginUser);
 router.post('/logout', logoutUser);
 router.post('/refreshToken', refreshAccessToken);
 

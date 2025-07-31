@@ -1,4 +1,11 @@
-import mongoose, { Document, Schema } from "mongoose";
+import mongoose, { Document, Schema, Model } from "mongoose";
+
+interface ILocation {
+  latitude: number;
+  longitude: number;
+  formattedAddress?: string;
+  coordinates?: [number, number]; 
+}
 
 export interface IBook extends Document {
   title: string;
@@ -10,13 +17,10 @@ export interface IBook extends Document {
   imageUrl: string;
   cloudinaryPublicId?: string;
   seller: mongoose.Types.ObjectId;
-  location: {
-    type: "Point";
-    coordinates: [number, number]; 
-    formattedAddress?: string;
-  };
+  location: ILocation;
 }
 
+// Schema Definition
 const bookSchema = new Schema<IBook>(
   {
     title: { type: String, required: true },
@@ -36,23 +40,29 @@ const bookSchema = new Schema<IBook>(
     },
 
     location: {
-      type: {
-        type: String,
-        enum: ["Point"],
-        required: true,
-      },
-      coordinates: {
-        type: [Number], // [longitude, latitude]
-        required: true,
-      },
+      latitude: { type: Number, required: true },
+      longitude: { type: Number, required: true },
       formattedAddress: { type: String },
+      coordinates: {
+        type: [Number], 
+        index: "2dsphere",
+      },
     },
   },
   { timestamps: true }
 );
 
-// Create 2dsphere index for $near
-bookSchema.index({ location: "2dsphere" });
+bookSchema.pre<IBook>("save", function (next) {
+  if (this.location && this.location.longitude && this.location.latitude) {
+    this.location.coordinates = [
+      this.location.longitude,
+      this.location.latitude,
+    ];
+  }
+  next();
+});
 
-const Book = mongoose.model<IBook>("Book", bookSchema);
+// Model
+const Book: Model<IBook> = mongoose.model<IBook>("Book", bookSchema);
+
 export default Book;

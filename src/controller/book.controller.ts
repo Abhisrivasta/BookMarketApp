@@ -5,19 +5,18 @@ import { AuthRequest } from "../middleware/verifyToken";
 import { v2 as cloudinary } from "cloudinary";
 import { getHumanReadableLocation } from "../geocode";
 
-
-
 export const handleCreateBook = async (req: AuthRequest, res: Response) => {
   if (typeof req.body.location === "string") {
     try {
       req.body.location = JSON.parse(req.body.location);
-      console.log("Parsed location:", req.body.location);
-    } catch {
+      console.log(req.body.location)
+    } catch (err) {
       return res.status(400).json({ message: "Invalid location format" });
     }
   }
 
   const result = createBookSchemaValidator.safeParse(req.body);
+
   if (!result.success) {
     return res.status(400).json({
       message: "Validation failed",
@@ -36,33 +35,29 @@ export const handleCreateBook = async (req: AuthRequest, res: Response) => {
   const sellerId = (req.user as any).id;
 
   try {
-    const [longitude, latitude] = location.coordinates;
+    const formattedAddress = await getHumanReadableLocation(location.latitude, location.longitude);
 
-    const formattedAddress = await getHumanReadableLocation(latitude, longitude);
+  const book = await Book.create({
+  title,
+  author,
+  description,
+  examType,
+  price,
+  imageUrl,
+  cloudinaryPublicId,
+  location: {
+    ...location,
+    formattedAddress,
+    coordinates: [location.longitude, location.latitude]
+  },
+  seller: sellerId,
+});
 
-    const book = await Book.create({
-      title,
-      author,
-      description,
-      examType,
-      price,
-      imageUrl,
-      cloudinaryPublicId,
-      location: {
-        type: "Point",
-        coordinates: [longitude, latitude], 
-        formattedAddress,
-      },
-      seller: sellerId,
-    });
 
-    return res.status(201).json({
-      message: "Book created successfully",
-      book,
-    });
+    return res.status(201).json({ message: "Book created successfully", book });
   } catch (error) {
     console.error("Create book error:", error);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Internal server error", error });
   }
 };
 
@@ -82,7 +77,7 @@ export const handleGetBookById = async (req: AuthRequest, res: Response) => {
 
 
   try {
-    const book = await Book.findById(id).populate("seller", "name email phone");
+const book = await Book.findById(id).populate("seller", "name email phone");
 
     if (!book) {
       return res.status(404).json({ message: "Book not found" });
@@ -104,14 +99,16 @@ export const handleGetBookById = async (req: AuthRequest, res: Response) => {
 export const handleGetAllBooks = async (req: Request, res: Response) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 10;
-
+    const limit = parseInt(req.query.limit as string) || 7; // default 7 books per page
     const search = req.query.search as string;
     const priceMin = parseFloat(req.query.priceMin as string);
     const priceMax = parseFloat(req.query.priceMax as string);
     const condition = req.query.condition as string;
-    const sort = req.query.sort as string;
 
+    const lat = parseFloat(req.query.latitude as string);
+    const lng = parseFloat(req.query.longitude as string);
+
+    // Build filter
     let filter: any = {};
 
     if (search) {
@@ -131,24 +128,76 @@ export const handleGetAllBooks = async (req: Request, res: Response) => {
       filter.condition = condition;
     }
 
-    let query = Book.find(filter)
-      .populate("seller", "name email phone")
-      .lean()
-      .skip((page - 1) * limit)
-      .limit(limit);
+    let books;
+    let total;
 
-    if (sort === "asc") query = query.sort({ price: 1 });
-    if (sort === "desc") query = query.sort({ price: -1 });
+    // ✅ If latitude & longitude are passed → calculate distance
+    if (!isNaN(lat) && !isNaN(lng)) {
+      const basePipeline: any[] = [
+        {
+          $geoNear: {
+            near: { type: "Point", coordinates: [lng, lat] },
+            distanceField: "distanceInMeters",
+            spherical: true
+          }
+        },
+        { $match: filter }
+      ];
 
-    const total = await Book.countDocuments(filter);
-    const books = await query;
+      // 🔹 Total count (no skip/limit)
+      const totalResult = await Book.aggregate([
+        ...basePipeline,
+        { $count: "total" }
+      ]);
+      total = totalResult[0]?.total || 0;
+
+      // 🔹 Paginated books
+      books = await Book.aggregate([
+        ...basePipeline,
+        { $skip: (page - 1) * limit },
+        { $limit: limit },
+        {
+          $lookup: {
+            from: "users",
+            localField: "seller",
+            foreignField: "_id",
+            as: "seller"
+          }
+        },
+        { $unwind: "$seller" },
+        {
+          $project: {
+            title: 1,
+            author: 1,
+            price: 1,
+            description: 1,
+            imageUrl: 1,
+            "seller.name": 1,
+            "seller.phone": 1,
+            distanceInKm: { $round: [{ $divide: ["$distanceInMeters", 1000] }, 1] }
+          }
+        }
+      ]);
+    } else {
+      // ✅ Normal query without distance
+      total = await Book.countDocuments(filter);
+      books = await Book.find(filter)
+        .populate("seller", "name phone")
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean();
+    }
+
     const totalPages = Math.ceil(total / limit);
-
     res.status(200).json({ total, totalPages, page, limit, books });
+
   } catch (error) {
+    console.error("Error fetching books:", error);
     res.status(500).json({ message: "Server error", error });
   }
 };
+
+
 
 
 //handle get books of user 
@@ -163,7 +212,7 @@ export const hanldeGetMyBooks = async (req: AuthRequest, res: Response) => {
     const books = await Book.find({ seller: sellerId })
       .limit(limit)
       .skip((page - 1) * limit)
-      .populate("seller", "name email phone");
+      .populate("seller",  "name email phone");
 
     const totalPages = Math.ceil(total / limit);
 
@@ -180,20 +229,7 @@ export const updateBook = async (req: AuthRequest, res: Response) => {
   if (!id) return res.status(400).json({ message: "Book ID is required" });
 
   const userId = req.user?.id;
-
-  // Parse location if sent as string
-  if (typeof req.body.location === "string") {
-    try {
-      req.body.location = JSON.parse(req.body.location);
-    } catch {
-      return res.status(400).json({ message: "Invalid location format" });
-    }
-  }
-
-  const { title, author, description, examType, price, condition, location } = req.body;
-
-  const newImageUrl = res.locals.cloudinaryImageUrl as string | undefined;
-  const newCloudinaryPublicId = res.locals.cloudinaryPublicId as string | undefined;
+  const { title, author, description, examType, price, condition } = req.body;
 
   try {
     const book = await Book.findById(id);
@@ -205,44 +241,19 @@ export const updateBook = async (req: AuthRequest, res: Response) => {
       return res.status(403).json({ message: "You are not authorized to update this book" });
     }
 
-    // Update basic fields
-    book.title = title || book.title;
-    book.author = author || book.author;
-    book.description = description || book.description;
-    book.examType = examType || book.examType;
-    book.price = price || book.price;
-    book.condition = condition || book.condition;
+    book.title = title;
+    book.author = author;
+    book.description = description;
+    book.examType = examType;
+    book.price = price;
+    book.condition = condition;
 
-    // Handle image update
-    if (!book.imageUrl) {
-      book.imageUrl = "https://peoplesblog.co.in/sri-vedanta-swarajya-sangam/assets/img/books/default.jpeg";
-    }
-
-    if (newImageUrl) {
-      if (book.cloudinaryPublicId) {
-        await cloudinary.uploader.destroy(book.cloudinaryPublicId);
-      }
-      book.imageUrl = newImageUrl;
-      book.cloudinaryPublicId = newCloudinaryPublicId;
-    }
-
-    // Handle location update if new latitude & longitude are provided
-    if (location?.latitude && location?.longitude) {
-      const formattedAddress = await getHumanReadableLocation(location.latitude, location.longitude);
-      book.location = {
-        type: "Point",
-        coordinates: [Number(location.longitude), Number(location.latitude)], // GeoJSON order
-        formattedAddress,
-      };
+    if (req.file) {
     }
 
     const updatedBook = await book.save();
 
-    return res.status(200).json({
-      message: "Book updated successfully",
-      book: updatedBook
-    });
-
+    return res.status(200).json({ message: "Book updated successfully", book: updatedBook });
   } catch (error) {
     console.error("Update book error:", error);
     return res.status(500).json({ message: "Internal server error" });
@@ -269,11 +280,11 @@ export const handleDeleteMyBook = async (req: AuthRequest, res: Response) => {
       return res.status(403).json({ message: "You are not authorized to delete this book" });
     }
 
-    if (book.cloudinaryPublicId) {
+       if (book.cloudinaryPublicId) {
       await cloudinary.uploader.destroy(book.cloudinaryPublicId);
     }
 
-    await book.deleteOne();
+    await book.deleteOne(); 
 
     return res.status(200).json({ message: "Book deleted successfully" });
   } catch (error) {
@@ -283,29 +294,3 @@ export const handleDeleteMyBook = async (req: AuthRequest, res: Response) => {
 };
 
 
-//get nearby books
-export const getNearbyBooks = async (req: Request, res: Response) => {
-  try {
-    const { lat, lng, distance } = req.query;
-
-    if (!lat || !lng) {
-      return res.status(400).json({ message: "Latitude and Longitude are required" });
-    }
-
-    const maxDistance = distance ? Number(distance) * 1000 : 10000;
-
-    const books = await Book.find({
-      location: {
-        $near: {
-          $geometry: { type: "Point", coordinates: [parseFloat(lng as string), parseFloat(lat as string)] },
-          $maxDistance: maxDistance,
-        },
-      },
-    }).populate("seller", "name phone");
-
-    res.status(200).json(books);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
-  }
-};

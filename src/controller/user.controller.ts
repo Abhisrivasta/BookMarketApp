@@ -5,7 +5,7 @@ import bcrypt from "bcrypt"
 import { registerValidator, loginValidator, forgetPasswordValidator } from "../validators/userValidator";
 import nodemailer from "nodemailer"
 import { AuthRequest } from "../middleware/verifyToken";
-import Contact from "../models/Contact.model"; 
+import Contact from "../models/Contact.model";
 import { v2 as cloudinary } from "cloudinary";
 
 
@@ -24,9 +24,6 @@ export const registerUser = async (req: Request, res: Response) => {
   const imageUrl = res.locals.cloudinaryImageUrl as string;
   const cloudinaryPublicId = res.locals.cloudinaryPublicId as string;
 
-  if (!imageUrl || !cloudinaryPublicId) {
-    return res.status(400).json({ message: "Image URL missing" });
-  }
   try {
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -51,7 +48,7 @@ export const registerUser = async (req: Request, res: Response) => {
         name: newUser.name,
         email: newUser.email,
         phone: newUser.phone,
-        imageUrl: newUser.imageUrl 
+        imageUrl: newUser.imageUrl
       },
     });
 
@@ -59,7 +56,6 @@ export const registerUser = async (req: Request, res: Response) => {
     return res.status(500).json({ message: "Server error", error: (error as Error).message });
   }
 };
-
 
 
 
@@ -110,12 +106,13 @@ export const handleLoginUser = async (req: Request, res: Response) => {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    res.cookie("accessToken", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 1 *24*24*  60 * 1000,
-    });
+  res.cookie("accessToken", token, {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "strict",
+  maxAge: 2 * 24 * 60 * 60 * 1000, 
+});
+
 
 
     return res.status(200).json({
@@ -157,7 +154,7 @@ export const getUserProfile = async (req: Request, res: Response) => {
         name: user.name,
         email: user.email,
         phone: user.phone,
-        imageUrl:user.imageUrl
+        imageUrl: user.imageUrl
       },
     });
   } catch (err) {
@@ -256,11 +253,13 @@ export const refreshAccessToken = (req: Request, res: Response) => {
       { expiresIn: "1d" }
     );
 
+    const isProduction = process.env.NODE_ENV === "production";
+
     res.cookie("accessToken", accessToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 15 * 60 * 1000,
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
+  maxAge: 2 * 24 * 60 * 60 * 1000, 
     });
 
     return res.status(200).json({ accessToken });
@@ -380,7 +379,7 @@ export const contactUs = async (req: Request, res: Response) => {
 
     await transporter.sendMail({
       from: `"Book Store Contact" <${email}>`,
-      to: process.env.ADMIN_EMAIL, 
+      to: process.env.ADMIN_EMAIL,
       subject: `New Contact Message from ${name}`,
       html: `
         <p><b>Name:</b> ${name}</p>

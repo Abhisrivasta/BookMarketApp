@@ -1,16 +1,10 @@
 import { z } from "zod";
 
-const locationSchema = z
-  .object({
-    latitude: z.number(),
-    longitude: z.number(),
-    formattedAddress: z.string().optional(),
-  })
-  .transform((loc) => ({
-    type: "Point" as const,
-    coordinates: [loc.longitude, loc.latitude],
-    formattedAddress: loc.formattedAddress,
-  }));
+const locationSchema = z.object({
+  latitude: z.number(),
+  longitude: z.number(),
+  formattedAddress: z.string().optional(),
+});
 
 export const createBookSchemaValidator = z.object({
   title: z.string().min(1, "Title is required"),
@@ -22,5 +16,5 @@ export const createBookSchemaValidator = z.object({
 });
 
 export const getBookSchemaValidator = z.object({
-  id: z.string().length(24, "Invalid book ID"),
+  id: z.string().length(24, "Invalid book ID"), 
 });
