@@ -106,12 +106,12 @@ export const handleLoginUser = async (req: Request, res: Response) => {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-  res.cookie("accessToken", token, {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "strict",
-  maxAge: 2 * 24 * 60 * 60 * 1000, 
-});
+    res.cookie("accessToken", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 2 * 24 * 60 * 60 * 1000,
+    });
 
 
 
@@ -259,7 +259,7 @@ export const refreshAccessToken = (req: Request, res: Response) => {
       httpOnly: true,
       secure: isProduction,
       sameSite: isProduction ? "none" : "lax",
-  maxAge: 2 * 24 * 60 * 60 * 1000, 
+      maxAge: 2 * 24 * 60 * 60 * 1000,
     });
 
     return res.status(200).json({ accessToken });
@@ -293,7 +293,7 @@ export const forgetPassword = async (req: Request, res: Response) => {
       { expiresIn: "15m" }
     );
 
-    const resetLink = `http://localhost:5173/redirect-reset?token=${token}`;
+    const resetLink = `https://book-swap-frontend-theta.vercel.app/redirect-reset?token=${token}`;
 
     const transporter = nodemailer.createTransport({
       service: "Gmail",
