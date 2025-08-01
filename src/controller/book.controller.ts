@@ -9,7 +9,7 @@ export const handleCreateBook = async (req: AuthRequest, res: Response) => {
   if (typeof req.body.location === "string") {
     try {
       req.body.location = JSON.parse(req.body.location);
-      console.log(req.body.location)
+      // console.log(req.body.location)
     } catch (err) {
       return res.status(400).json({ message: "Invalid location format" });
     }
@@ -90,7 +90,7 @@ const book = await Book.findById(id).populate("seller", "name email phone");
 
     return res.status(200).json({ book, isOwner });
   } catch (error) {
-    console.error("Get book by ID error:", error);
+    // console.error("Get book by ID error:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -131,7 +131,6 @@ export const handleGetAllBooks = async (req: Request, res: Response) => {
     let books;
     let total;
 
-    // ✅ If latitude & longitude are passed → calculate distance
     if (!isNaN(lat) && !isNaN(lng)) {
       const basePipeline: any[] = [
         {
@@ -144,14 +143,12 @@ export const handleGetAllBooks = async (req: Request, res: Response) => {
         { $match: filter }
       ];
 
-      // 🔹 Total count (no skip/limit)
       const totalResult = await Book.aggregate([
         ...basePipeline,
         { $count: "total" }
       ]);
       total = totalResult[0]?.total || 0;
 
-      // 🔹 Paginated books
       books = await Book.aggregate([
         ...basePipeline,
         { $skip: (page - 1) * limit },
@@ -179,7 +176,6 @@ export const handleGetAllBooks = async (req: Request, res: Response) => {
         }
       ]);
     } else {
-      // ✅ Normal query without distance
       total = await Book.countDocuments(filter);
       books = await Book.find(filter)
         .populate("seller", "name phone")
@@ -192,7 +188,7 @@ export const handleGetAllBooks = async (req: Request, res: Response) => {
     res.status(200).json({ total, totalPages, page, limit, books });
 
   } catch (error) {
-    console.error("Error fetching books:", error);
+    // console.error("Error fetching books:", error);
     res.status(500).json({ message: "Server error", error });
   }
 };
@@ -255,7 +251,7 @@ export const updateBook = async (req: AuthRequest, res: Response) => {
 
     return res.status(200).json({ message: "Book updated successfully", book: updatedBook });
   } catch (error) {
-    console.error("Update book error:", error);
+    // console.error("Update book error:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -288,7 +284,7 @@ export const handleDeleteMyBook = async (req: AuthRequest, res: Response) => {
 
     return res.status(200).json({ message: "Book deleted successfully" });
   } catch (error) {
-    console.error("Delete book error:", error);
+    // console.error("Delete book error:", error);
     return res.status(500).json({ message: "Server error", error });
   }
 };
