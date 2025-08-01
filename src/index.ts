@@ -11,7 +11,7 @@ dotenv.config();
 
 const app = express();
 app.use(cors({
-  origin: "https://book-swap-frontend-theta.vercel.app",
+origin: process.env.CLIENT_URL,
   credentials: true
 }));
 
@@ -36,6 +36,7 @@ mongoose.connect(process.env.MONGO_URI as string)
     console.error('❌ Error connecting to MongoDB:', err);
   });
 
-app.listen(5000, () => {
-  console.log('🚀 Server is running on http://localhost:5000');
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`🚀 Server is running on http://localhost:${PORT}`);
 });
