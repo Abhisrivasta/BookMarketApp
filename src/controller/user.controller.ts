@@ -221,16 +221,20 @@ export const updateUserProfile = async (req: AuthRequest, res: Response) => {
 
 //logout
 export const logoutUser = (req: Request, res: Response) => {
-  res.clearCookie("refreshToken", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-  });
+  const isProd = process.env.NODE_ENV === "production";
+
   res.clearCookie("accessToken", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    secure: isProd,
+    sameSite: isProd ? "none" : "lax",
   });
+
+  res.clearCookie("refreshToken", {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? "none" : "lax",
+  });
+
 
   return res.status(200).json({ message: "Logged out successfully" });
 };
